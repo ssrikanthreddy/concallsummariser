@@ -18,7 +18,16 @@ from langchain.schema import (
     HumanMessage,
     AIMessage
 )
+class HumanMessage:
+    def __init__(self, content):
+        self.content = content
 
+    def to_dict(self):
+        return {"type": "human", "content": self.content}
+
+    @classmethod
+    def from_dict(cls, message_dict):
+        return cls(content=message_dict["content"])
 
 def main():
     # Create two tabs
@@ -101,63 +110,37 @@ def summary():
             st.write(result)
 
 def chat():
-    st.header("Chat with PDF 💬")
+    bruh = st.session_state.get('messages', [])
+    chat = Ollama(
+            model="mistral",
+            callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+        )
+    chain = load_qa_chain(llm=chat, chain_type="stuff")
+  
+       
 
-    # Initialize session state if not exists
+    # initialize message history
     if "messages" not in st.session_state:
         st.session_state.messages = [
             SystemMessage(content="You are a helpful assistant.")
         ]
 
-    # Check if a new chat has been requested
-    if st.button("New Chat"):
-        # Get the current conversation
-        current_conversation = st.session_state.get("current_conversation", [])
-        
-        # Store the current conversation in the list
-        current_conversation.append(st.session_state.messages)
-        
-        # Keep only the last 5 conversations
-        if len(current_conversation) > 5:
-            current_conversation.pop(0)
-        
-        # Reset the conversation state
-        st.session_state.messages = [
-            SystemMessage(content="You are a helpful assistant.")
-        ]
-        
-        # Update the current conversation list
-        st.session_state.current_conversation = current_conversation
-
-    chat = Ollama(
-        model="mistral",
-        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-    )
-
-    chain = load_qa_chain(llm=chat, chain_type="stuff")
-
-    # Accumulate the entire conversation history
-    all_messages = st.session_state.get("current_conversation", []) + st.session_state.get('messages', [])
-
-    # user input directly on the main page
-    user_input = st.text_input("Your message:", key="user_input")
-    
-    try:
-        docs = st.session_state.VectorStore.similarity_search(query=user_input, k=3)
-    except AttributeError as e:
-        st.write("!!! Document Not Loaded Yet !!!")
+    st.header("Chat with PDF 🤖")
+   
+    user_input = st.text_input("Your message: ", key="user_input")
 
     # handle user input
     if user_input:
+        bruh = st.session_state.get('messages', [])
+        docs = st.session_state.VectorStore.similarity_search(query=user_input, k=3)
         st.session_state.messages.append(HumanMessage(content=user_input))
+        
         with st.spinner("Thinking..."):
-            response = chain.run(input_documents=docs, question=user_input, context=all_messages)
-        st.session_state.messages.append(
-                AIMessage(content=response))
-
-    # Update the conversation history
-    st.session_state.messages = all_messages
-
+            response = chain.run(input_documents=docs, question=user_input, context=bruh)
+            
+        st.session_state.messages.append(AIMessage(content=response))
+    
+    
     # display message history
     messages = st.session_state.get('messages', [])
     for i, msg in enumerate(messages[1:]):
