@@ -13,7 +13,6 @@ from langchain.callbacks.manager import CallbackManager
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.embeddings import OllamaEmbeddings
 import os
-
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
 from langchain.schema import (
@@ -21,6 +20,8 @@ from langchain.schema import (
     HumanMessage,
     AIMessage
 )
+
+
 class HumanMessage:
     def __init__(self, content):
         self.content = content
@@ -90,7 +91,7 @@ def summary():
     if "summary" not in st.session_state:
         st.session_state.summary = False
      # Accept user questions/query
-    query = "Summerise the following conference call in detail, use a table in markdown for each question and answer."
+    query = "Summerise the following conference call in detail, use a table in markdown for each question and answer. Then also create a bulleted point summary of the whole transcript"
     if query and st.session_state.VectorStore:
         docs = st.session_state.VectorStore.similarity_search(query=query, k=3)
 
@@ -112,6 +113,15 @@ def summary():
        
         for result in st.session_state.ChatResults:
             st.write(result)
+
+        if st.button("Download Summary as Markdown"):
+            download_text = "\n\n".join(result for result in st.session_state.ChatResults)
+            st.download_button(
+                label="Download",
+                data=download_text,
+                file_name="summary.md",
+                mime="text/markdown"
+            )
 
 def chat():
     if "memory" not in st.session_state:
