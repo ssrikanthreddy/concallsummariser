@@ -13,6 +13,9 @@ from langchain.callbacks.manager import CallbackManager
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.embeddings import OllamaEmbeddings
 import os
+
+from langchain.chains import ConversationalRetrievalChain
+from langchain.memory import ConversationBufferMemory
 from langchain.schema import (
     SystemMessage,
     HumanMessage,
@@ -84,9 +87,10 @@ def home():
 def summary():
     st.header("PDF Summerizer")
     
-    
+    if "summary" not in st.session_state:
+        st.session_state.summary = False
      # Accept user questions/query
-    query = st.text_input("Ask questions about your PDF file:")
+    query = "Summerise the following conference call in detail, use a table in markdown for each question and answer."
     if query and st.session_state.VectorStore:
         docs = st.session_state.VectorStore.similarity_search(query=query, k=3)
 
@@ -105,17 +109,25 @@ def summary():
         
         st.session_state.ChatResults.append(response)
 
-        # Display chat results
+       
         for result in st.session_state.ChatResults:
             st.write(result)
 
 def chat():
+    if "memory" not in st.session_state:
+        st.session_state.memory = None
     bruh = st.session_state.get('messages', [])
     chat = Ollama(
             model="mistral",
             callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
         )
-    chain = load_qa_chain(llm=chat, chain_type="stuff")
+    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
+    chain = ConversationalRetrievalChain.from_llm(
+    chat, 
+    st.session_state.VectorStore.as_retriever(search_kwargs={"k": 3}),
+    memory=memory
+)
   
        
 
@@ -136,9 +148,9 @@ def chat():
         st.session_state.messages.append(HumanMessage(content=user_input))
         
         with st.spinner("Thinking..."):
-            response = chain.run(input_documents=docs, question=user_input, context=bruh)
+            response = chain({"question": user_input})
             
-        st.session_state.messages.append(AIMessage(content=response))
+        st.session_state.messages.append(AIMessage(content=response['answer']))
     
     
     # display message history
